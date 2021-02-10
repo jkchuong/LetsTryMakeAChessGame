@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -50,6 +52,7 @@ namespace LetsTryMakeAChessGame
                     button.Click += GridButton_Click;
                     button.FontSize = 50;
                     button.Tag = chessboard.Board[row, col];
+                    chessboard.Board[row, col].Name = button.Name;
                     Chessboard.Children.Add(button);
                     isBlack = !isBlack;
                 }
@@ -58,17 +61,47 @@ namespace LetsTryMakeAChessGame
 
         private void GridButton_Click(object sender, RoutedEventArgs e)
         {
+            // Disable buttons
+
             // Check if users turn
 
             // Get info about Cell
             Button clickedButton = (sender as Button);
             Cell clickedCell = clickedButton.Tag as Cell;
 
+            List<Pieces> whitePieces;
+            List<Pieces> blackPieces;
+
             // If user intends to move
             if (clickedCell.IsLegal)
             {
-                PrintMoveHistory(currentCell, clickedCell, clickedButton);
+                // Move the piece and update the board
+                PrintMoveHistory(currentCell, clickedCell);
                 MovePiece(currentCell, clickedCell);
+
+                UpdateBoardState();
+
+                // Check if game over
+                whitePieces = SearchForPieces(true);
+                blackPieces = SearchForPieces(false);
+
+                if (IsGameOver(whitePieces, blackPieces))
+                {
+                    NewGame();
+                }
+                else
+                {
+                    ComputerMove(blackPieces);
+                }
+
+
+                whitePieces = SearchForPieces(true);
+
+                if (IsGameOver(whitePieces, blackPieces))
+                {
+                    NewGame();
+                }
+
             }
 
             // If user wants to look for legal moves
@@ -84,31 +117,20 @@ namespace LetsTryMakeAChessGame
                 chessboard.ClearMarkedLegalMoves();
             }
 
-            List<Pieces> whitePieces = SearchForPieces(true);
-            List<Pieces> blackPieces = SearchForPieces(false);
-
-            UpdateBoardState();
             currentCell = clickedCell;
 
-            if (IsGameOver(whitePieces, blackPieces))
-            {
-                NewGame();
-            }
-
-            //ComputerMove(blackPieces);
-
-            //UpdateBoardState();
-
-            //if (IsGameOver(whitePieces, blackPieces))
-            //{
-            //    NewGame();
-            //}
+            UpdateBoardState();
 
         }
 
         private void ComputerMove(List<Pieces> blackPieces)
         {
+
+            // Delay before computer move
             Random rnd = new Random();
+            Task.Delay(rnd.Next(500, 2000));
+
+
             bool hasNotMoved = true;
             while (hasNotMoved)
             {
@@ -126,7 +148,9 @@ namespace LetsTryMakeAChessGame
                         }
                     }
 
+                    // Print Move History
                     Cell newCell = legalPositions[rnd.Next(0, legalPositions.Count - 1)];
+                    PrintMoveHistory(piece.Position, newCell);
                     MovePiece(piece.Position, newCell);
 
                     hasNotMoved = false;
@@ -136,6 +160,8 @@ namespace LetsTryMakeAChessGame
                     blackPieces.Remove(piece);
                 }
             }
+            chessboard.ClearMarkedLegalMoves();
+
         }
 
         private bool IsGameOver(List<Pieces> whitePieces, List<Pieces> blackPieces)
@@ -154,23 +180,31 @@ namespace LetsTryMakeAChessGame
             return false;
         }
 
-        private void PrintMoveHistory(Cell currentCell, Cell clickedCell, Button clickedButton)
+        private void PrintMoveHistory(Cell beforeCell, Cell afterCell)
         {
             string message = "\r\n ";
-            if (currentCell.piece.Name == "Pawn")
+            if (beforeCell.piece.Name == "Pawn")
             {
-                message += $"{clickedButton.Name}";
+                // Pawn moves into empty cell print only cell name
+                if (!afterCell.IsOccupied)
+                {
+                    message += $"{afterCell.Name}";
+                }
+                else
+                {
+                    message += $"{beforeCell.Name[0]}x{afterCell.Name}";
+                }
             }
-            else if (!clickedCell.IsOccupied)
+            else if (!afterCell.IsOccupied)
             {
-                message += $"{Rulebook.ConvertPieceToInitial(currentCell.piece)}{clickedButton.Name}";
+                message += $"{Rulebook.ConvertPieceToInitial(beforeCell.piece)}{afterCell.Name}";
             }
             else
             {
-                message += $"{Rulebook.ConvertPieceToInitial(currentCell.piece)}x{clickedButton.Name}";
+                message += $"{Rulebook.ConvertPieceToInitial(beforeCell.piece)}x{afterCell.Name}";
             }
 
-            if (currentCell.piece.IsWhite)
+            if (beforeCell.piece.IsWhite)
             {
                 Test.Text += message;
             }
